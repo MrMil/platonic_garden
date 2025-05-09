@@ -1,13 +1,13 @@
 {
-  "led_per_side": 15,
-  "faces": [
-    {"layer": 0, "index": 0, "face_id": 0},
-    {"layer": 0, "index": 1, "face_id": 1},
-    {"layer": 0, "index": 2, "face_id": 2},
-    {"layer": 0, "index": 3, "face_id": 3},
-    {"layer": 1, "index": 2, "face_id": 4},
-    {"layer": 1, "index": 3, "face_id": 5},
-    {"layer": 1, "index": 1, "face_id": 6},
-    {"layer": 1, "index": 0, "face_id": 7}
-  ]
+    "led_per_side": 15,
+    "faces": [
+        { "layer": 0, "index": 0, "face_id": 0, "pos": [ 0.5, 0.83333334, 0.3333333333333333 ] },
+        { "layer": 0, "index": 1, "face_id": 1, "pos": [ 0.16666666, 0.5, 0.3333333333333333 ] },
+        { "layer": 0, "index": 2, "face_id": 2, "pos": [ 0.5, 0.16666666, 0.3333333333333333 ] },
+        { "layer": 0, "index": 3, "face_id": 3, "pos": [ 0.83333334, 0.5, 0.3333333333333333 ] },
+        { "layer": 1, "index": 2, "face_id": 4, "pos": [ 0.83333334, 0.5, 0.6666666666666667 ] },
+        { "layer": 1, "index": 3, "face_id": 5, "pos": [ 0.5, 0.16666666, 0.6666666666666667 ] },
+        { "layer": 1, "index": 1, "face_id": 6, "pos": [ 0.16666666, 0.5, 0.6666666666666667 ] },
+        { "layer": 1, "index": 0, "face_id": 7, "pos": [ 0.5, 0.83333334, 0.6666666666666667 ] }
+    ]
 }
