@@ -20,8 +20,8 @@ class TempratureSettings:
     
     def set_values_to_default(self):
         self.TEMPRATURE_CHANGE_THRESHOLD = 1000
-        self.TEMP_DELTA_UP = 10
-        self.TEMP_DELTA_DOWN = 2
+        self.TEMP_DELTA_UP = 30
+        self.TEMP_DELTA_DOWN = 10
 
 
 DO_LOCK_ANIMATION = False
