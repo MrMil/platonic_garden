@@ -10,7 +10,7 @@ from utils import SharedState, read_until_null_terminator
 import wifi_consts
 
 
-TIME_BETWEEN_ANIMATIONS_SECONDS = 60
+TIME_BETWEEN_ANIMATIONS_SECONDS = 90
 LOCK_WINDOW_SECONDS = 10
 MAX_LOCK_TIME_SECONDS = 60
 

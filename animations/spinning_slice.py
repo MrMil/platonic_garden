@@ -33,7 +33,7 @@ PALETTES = [
 ]
 
 # --- Animation Constants ---
-FPS = 30
+FPS = 20
 FRAME_TIME_MS = int(1000 / FPS)
 SECONDS_PER_REVOLUTION = 3
 SLICE_WIDTH_DEGREES = 60.0

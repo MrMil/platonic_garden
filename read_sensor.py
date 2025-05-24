@@ -24,6 +24,8 @@ class TempratureSettings:
         self.TEMP_DELTA_DOWN = 2
 
 
+DO_LOCK_ANIMATION = False
+
 I2C_FREQ = 400000
 REINIT_INTERVAL = 20 * 60 * 1000  # 20 minutes in milliseconds
 
@@ -129,7 +131,8 @@ async def read_sensor(state: SharedState):
 
     # New state variables for temperature monitoring and lock message cooldown
     # temp_history_per_sensor = [[] for _ in range(len(pins))] # Old list-based history
-    temp_history_per_sensor = [deque((), MAX_TEMP_HISTORY_LENGTH) for _ in range(len(pins))]
+    if DO_LOCK_ANIMATION:
+        temp_history_per_sensor = [deque((), MAX_TEMP_HISTORY_LENGTH) for _ in range(len(pins))]
 
     # Initialize last_lock_sent_time to be more than cooldown in the past to allow immediate sending
     _initial_current_time_for_lock_logic = utime.ticks_ms()
@@ -187,45 +190,46 @@ async def read_sensor(state: SharedState):
             avg_read_time = 0
         
         # New feature: Check for temperature rise and send lock message
-        lock_animation_triggered_this_cycle = False
-        triggering_sensor_index = -1
-        triggering_sensor_temp = -1
+        if DO_LOCK_ANIMATION:
+            lock_animation_triggered_this_cycle = False
+            triggering_sensor_index = -1
+            triggering_sensor_temp = -1
 
-        for i in range(len(pins)): # Iterate through all sensor temperature slots
-            current_temp_for_sensor = sensor_temp_array[i]
+            for i in range(len(pins)): # Iterate through all sensor temperature slots
+                current_temp_for_sensor = sensor_temp_array[i]
 
-            # Update history for sensor i
-            # history = temp_history_per_sensor[i] # No longer needed to get a mutable list reference
-            # history.append((current_loop_time, current_temp_for_sensor))
-            # Prune history: keep entries from the last TEMP_HISTORY_WINDOW_MS seconds
-            # temp_history_per_sensor[i] = [(t, temp) for t, temp in history if utime.ticks_diff(current_loop_time, t) <= TEMP_HISTORY_WINDOW_MS]
-            # With deque(maxlen=...), appending handles pruning automatically.
-            temp_history_per_sensor[i].append((current_loop_time, current_temp_for_sensor))
+                # Update history for sensor i
+                # history = temp_history_per_sensor[i] # No longer needed to get a mutable list reference
+                # history.append((current_loop_time, current_temp_for_sensor))
+                # Prune history: keep entries from the last TEMP_HISTORY_WINDOW_MS seconds
+                # temp_history_per_sensor[i] = [(t, temp) for t, temp in history if utime.ticks_diff(current_loop_time, t) <= TEMP_HISTORY_WINDOW_MS]
+                # With deque(maxlen=...), appending handles pruning automatically.
+                temp_history_per_sensor[i].append((current_loop_time, current_temp_for_sensor))
 
-            # Check for temperature rise for sensor i
-            for recorded_time, recorded_temp in temp_history_per_sensor[i]: # Iterating deque is fine
-                # Check if current temp is >TEMP_RISE_THRESHOLD higher than any recorded temp in the window
-                if current_temp_for_sensor - recorded_temp > TEMP_RISE_THRESHOLD:
-                    lock_animation_triggered_this_cycle = True
-                    triggering_sensor_index = i
-                    triggering_sensor_temp = current_temp_for_sensor
-                    break  # Found a rise for this sensor, no need to check its further history
-            
-            if lock_animation_triggered_this_cycle:
-                break # Found a rise in one sensor, proceed to check cooldown and send
-
-        if lock_animation_triggered_this_cycle:
-            # Check cooldown: more than LOCK_MESSAGE_COOLDOWN_MS ms since last "LOCK_ANIMATION"
-            if utime.ticks_diff(current_loop_time, last_lock_sent_time) > LOCK_MESSAGE_COOLDOWN_MS:
-                print(f"Sensor temperature spike detected (sensor {triggering_sensor_index}, current temp {triggering_sensor_temp}). Sending LOCK_ANIMATION.")
-                try:
-                    response = await send_message(b"LOCK_ANIMATION", False)
-                    print(f"LOCK_ANIMATION message sent successfully. Response: {response}")
-                except Exception as e_send:
-                    print("Exception occurred while sending LOCK_ANIMATION message:")
-                    sys.print_exception(e_send) # Requires 'import sys'
+                # Check for temperature rise for sensor i
+                for recorded_time, recorded_temp in temp_history_per_sensor[i]: # Iterating deque is fine
+                    # Check if current temp is >TEMP_RISE_THRESHOLD higher than any recorded temp in the window
+                    if current_temp_for_sensor - recorded_temp > TEMP_RISE_THRESHOLD:
+                        lock_animation_triggered_this_cycle = True
+                        triggering_sensor_index = i
+                        triggering_sensor_temp = current_temp_for_sensor
+                        break  # Found a rise for this sensor, no need to check its further history
                 
-                last_lock_sent_time = current_loop_time # Update time of last sent message (or attempt)
+                if lock_animation_triggered_this_cycle:
+                    break # Found a rise in one sensor, proceed to check cooldown and send
+
+            if lock_animation_triggered_this_cycle:
+                # Check cooldown: more than LOCK_MESSAGE_COOLDOWN_MS ms since last "LOCK_ANIMATION"
+                if utime.ticks_diff(current_loop_time, last_lock_sent_time) > LOCK_MESSAGE_COOLDOWN_MS:
+                    print(f"Sensor temperature spike detected (sensor {triggering_sensor_index}, current temp {triggering_sensor_temp}). Sending LOCK_ANIMATION.")
+                    try:
+                        response = await send_message(b"LOCK_ANIMATION", False)
+                        print(f"LOCK_ANIMATION message sent successfully. Response: {response}")
+                    except Exception as e_send:
+                        print("Exception occurred while sending LOCK_ANIMATION message:")
+                        sys.print_exception(e_send) # Requires 'import sys'
+                    
+                    last_lock_sent_time = current_loop_time # Update time of last sent message (or attempt)
         await state.update("distances", sensor_readings)
         #print(f"\rDistances: {sensor_readings} Time: {avg_read_time}ms", end="")
         await asyncio.sleep(SENSOR_LOOP_DELAY_S)

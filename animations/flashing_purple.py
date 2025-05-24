@@ -13,7 +13,7 @@ async def animate(
     layer_ratio = num_steps / len(shape.layers)
     reverse_start_step = num_steps - 1
     minimum_intensity = 50
-    frame_time_ms = 1000/30
+    frame_time_ms = 1000/20
     
     # Framerate tracking variables
     total_frames = 0
