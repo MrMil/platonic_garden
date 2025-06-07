@@ -15,25 +15,13 @@ async def connect_to_wifi():
         wlan = network.WLAN(network.STA_IF)
         
         wlan.active(False)
-        await uasyncio.sleep(0.2)  # Allow time for deactivation
+        await uasyncio.sleep(1)  # Allow time for deactivation
         
         wlan.active(True)
-        
-        # Scan for available networks
-        networks = wlan.scan()
-        ap_found = False
-        for net in networks:
-            ssid = net[0].decode('utf-8')
-            rssi = net[3]
-            channel = net[2]
-            if ssid == wifi_consts.WIFI_SSID:
-                ap_found = True
-                
-        if not ap_found:
-            # Continue anyway to see what happens
-            pass
+        await uasyncio.sleep(1)  # Allow time for activation
 
         if not wlan.isconnected():
+            print(f"Attempting to connect to {wifi_consts.WIFI_SSID}")
             wlan.connect(wifi_consts.WIFI_SSID, wifi_consts.WIFI_PASSWORD)
             
             max_wait = 20  # Increased wait time
@@ -45,6 +33,7 @@ async def connect_to_wifi():
                 await uasyncio.sleep(1)  # Use async sleep
         
         if wlan.isconnected():
+            print("WiFi connected successfully")
             return True
         else:
             status = wlan.status()
@@ -156,9 +145,74 @@ async def is_wifi_connected():
     wlan = network.WLAN(network.STA_IF)
     return wlan.isconnected()
 
-async def main():
-    animation = await fetch_animation_data()
+async def listen_for_udp_state(state: SharedState):
+    """Listens for UDP broadcast messages containing state updates."""
+    sock = None
+    while True:
+        try:
+            print("start of udp socket")
+            # Close previous socket if it exists
+            if sock:
+                try:
+                    sock.close()
+                except Exception as e:
+                    print(f"Error closing previous socket: {e}")
 
+            # Create new socket
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            sock.setblocking(False)  # Make socket non-blocking
+            sock.bind(('0.0.0.0', wifi_consts.UDP_PORT))
+            print(f"UDP listener started/refreshed on port {wifi_consts.UDP_PORT}")
+            
+            # Listen for 10 seconds before recreating socket
+            start_time = time.time()
+            while time.time() - start_time < 10:
+                try:
+                    data, addr = sock.recvfrom(1024)
+                    print(f"Raw UDP data received from {addr} {data}")
+                    try:
+                        state_data = json.loads(data.decode('utf-8'))
+                        print(f"Decoded UDP data: {state_data}")
+                        animation_name = state_data.get('animation')
+                        if animation_name is not None:
+                            print(f"Received UDP animation update: {animation_name}")
+                            await state.update('animation', animation_name)
+                            print(f"State updated with animation: {animation_name}")
+                    except json.JSONDecodeError as e:
+                        print(f"JSON decode error: {e}")
+                        print(f"Raw data was: {data}")
+                        sys.print_exception(e)
+                except OSError as e:
+                    if e.errno != 11:  # EAGAIN/EWOULDBLOCK is expected for non-blocking sockets
+                        print(f"Socket error: {e}")
+                        sys.print_exception(e)
+                await uasyncio.sleep_ms(100)  # Give other tasks a chance to run
+            
+        except Exception as e:
+            print(f"General error in UDP listener: {e}")
+            sys.print_exception(e)
+            if sock:
+                try:
+                    sock.close()
+                except:
+                    pass
+        await uasyncio.sleep_ms(100)  # Small delay before recreating socket
+
+async def main():
+    tasks = []
+    tasks.append(listen_for_udp_state())
+    tasks.append(fetch_animation_data())
+    await uasyncio.gather(*tasks)
+
+async def maintain_connection():
+    """Maintains WiFi connection by checking every 5 seconds and reconnecting if needed."""
+    print("Starting WiFi connection maintenance")
+    while True:
+        if not await is_wifi_connected():
+            print("WiFi disconnected, attempting to reconnect...")
+            await connect_to_wifi()
+        await uasyncio.sleep(5)
 
 if __name__ == "__main__":
     if connect_to_wifi():

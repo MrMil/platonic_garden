@@ -114,6 +114,5 @@ async def animate(
 
         # Frame timing
         frame_duration = utime.ticks_diff(utime.ticks_ms(), frame_start)
-        if frame_duration < FRAME_TIME_MS:
-            await asyncio.sleep_ms(FRAME_TIME_MS - frame_duration)
+        await asyncio.sleep_ms(max(10, FRAME_TIME_MS - frame_duration))
 

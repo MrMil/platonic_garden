@@ -3,6 +3,7 @@ import json
 from typing import Tuple, List
 import neopixel
 import machine
+import sys
 
 SHAPE_LED_PIN = 18
 SMALL_SHAPE_LED_PIN = 13
@@ -53,7 +54,10 @@ class Shape:
             
     def write(self) -> None:
         """Write the LED buffer to the physical LEDs."""
-        self.np.write()
+        try:
+            self.np.write()
+        except Exception as e:
+            sys.print_exception(e)
         
         
         if self.name == "octahedron":
@@ -74,7 +78,10 @@ class Shape:
             color = self[self.leds_per_face * self.layers[0][0]]
             
         self.small_np.fill(color)
-        self.small_np.write()
+        try:
+            self.small_np.write()
+        except Exception as e:
+            sys.print_exception(e)
         
     def __getitem__(self, index: int) -> Tuple[int, int, int]:
         """Get the color of an LED at the specified index."""

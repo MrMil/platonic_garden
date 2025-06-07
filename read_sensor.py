@@ -19,7 +19,7 @@ class TempratureSettings:
         return cls._instance
     
     def set_values_to_default(self):
-        self.TEMPRATURE_CHANGE_THRESHOLD = 1000
+        self.TEMPRATURE_CHANGE_THRESHOLD = 800
         self.TEMP_DELTA_UP = 30
         self.TEMP_DELTA_DOWN = 10
 

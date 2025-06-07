@@ -8,11 +8,13 @@ import random
 import time
 from utils import SharedState, read_until_null_terminator
 import wifi_consts
+import machine
 
 
 TIME_BETWEEN_ANIMATIONS_SECONDS = 90
 LOCK_WINDOW_SECONDS = 10
 MAX_LOCK_TIME_SECONDS = 60
+OPEN_SOCKET_SERVER = False  # Set to False to disable TCP server
 
 HOST_IP = wifi_consts.ACCESS_POINT_IP_ADDRESS # Listen on the AP's IP address
 
@@ -42,7 +44,7 @@ RESPONSES = {
 
 async def handle_client(reader, writer, state: SharedState):
     """
-    Handles incoming client connections.
+    Handles incoming client ions.
     Reads a request (ending with null terminator), sends a JSON response (ending with null terminator),
     and expects an ACK.
     """
@@ -65,8 +67,7 @@ async def handle_client(reader, writer, state: SharedState):
             writer.write(b"UNKNOWN_REQUEST\x00")
             await writer.drain()
 
-        # 4. Wait for ACK from client
-        ack = await uasyncio.wait_for(reader.read(3), timeout=ACK_READ_TIMEOUT_S) # Expect "ACK" (3 bytes)
+        uasyncio.sleep(0.5)
 
     except uasyncio.TimeoutError as te:
         sys.print_exception(te) # Provide traceback for timeout
@@ -97,24 +98,29 @@ async def start_ap(state: SharedState):
     while not ap.active():
         await uasyncio.sleep_ms(100)
 
-    # 2. Start the asynchronous server
-    try:
-        # Use a lambda to pass the state to handle_client
-        server = await uasyncio.start_server(
-            lambda r, w: handle_client(r, w, state),
-            HOST_IP, 
-            wifi_consts.PORT
-        )
-        print(f"Server started on {HOST_IP}:{wifi_consts.PORT}")
+    # 2. Start the asynchronous server only if OPEN_SOCKET_SERVER is True
+    if OPEN_SOCKET_SERVER:
+        try:
+            # Use a lambda to pass the state to handle_client
+            server = await uasyncio.start_server(
+                lambda r, w: handle_client(r, w, state),
+                HOST_IP, 
+                wifi_consts.PORT
+            )
+            print(f"Server started on {HOST_IP}:{wifi_consts.PORT}")
+            while True:
+                await uasyncio.sleep(10) # Keep the event loop alive
+        except Exception as e:
+            pass
+        finally:
+            if 'server' in locals() and hasattr(server, 'close'):
+                server.close()
+                await server.wait_closed()
+            ap.active(False)
+    else:
+        print("TCP server disabled. Running in UDP-only mode.")
         while True:
-            await uasyncio.sleep(10) # Keep the event loop alive
-    except Exception as e:
-        pass
-    finally:
-        if 'server' in locals() and hasattr(server, 'close'):
-            server.close()
-            await server.wait_closed()
-        ap.active(False)
+            await uasyncio.sleep(10)  # Keep the event loop alive
 
 
 async def choose_animation(state: SharedState):
@@ -133,7 +139,35 @@ async def choose_animation(state: SharedState):
                    time.time() - animation_start_time < TIME_BETWEEN_ANIMATIONS_SECONDS + MAX_LOCK_TIME_SECONDS):
                 await uasyncio.sleep(1)
                 last_locked_animation = (await state.get_unsafe()).get('last_locked_animation')
-        
+
+
+async def restart_in_30_minutes() -> None:
+    await uasyncio.sleep(30 * 60)
+    print("Restarting after 30 minutes, see you soon!")
+    machine.reset()
+
+
+async def broadcast_state(state: SharedState):
+    """Broadcasts the current state via UDP every 3 seconds."""
+    sock = usocket.socket(usocket.AF_INET, usocket.SOCK_DGRAM)
+    sock.setsockopt(usocket.SOL_SOCKET, usocket.SO_BROADCAST, 1)
+    sock.setblocking(False)  # Make socket non-blocking
+    broadcast_addr = "255.255.255.255"
+    
+    while True:
+        try:
+            current_state = await state.get_unsafe()
+            state_json = json.dumps({'animation': current_state.get('animation')})
+            try:
+                sock.sendto(state_json.encode('utf-8'), (broadcast_addr, wifi_consts.UDP_PORT))
+                print(f"Broadcasted state: {state_json}")
+            except OSError as e:
+                if e.errno != 11:  # EAGAIN/EWOULDBLOCK is expected for non-blocking sockets
+                    sys.print_exception(e)
+        except Exception as e:
+            sys.print_exception(e)
+        await uasyncio.sleep(1)
+
 
 def main():
     try:
@@ -146,6 +180,8 @@ def main():
         tasks = []
         tasks.append(start_ap(state))
         tasks.append(choose_animation(state))
+        tasks.append(restart_in_30_minutes())
+        tasks.append(broadcast_state(state))  # Add UDP broadcast task
         uasyncio.run(uasyncio.gather(*tasks))
     except KeyboardInterrupt:
         raise

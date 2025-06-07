@@ -134,7 +134,7 @@ async def animate(
 
             shape.write()
             elapsed_ms = (time.time_ns() - frame_start_ns) / 1_000_000
-            await asyncio.sleep_ms(max(0, int(FRAME_TIME_MS - elapsed_ms)))
+            await asyncio.sleep_ms(max(10, int(FRAME_TIME_MS - elapsed_ms)))
             if speed_factor == 0: await asyncio.sleep_ms(50)
 
         # --- End of Cycle: Update Colors ---

@@ -7,3 +7,4 @@ GATEWAY = "10.0.0.1" # Typically same as IP for AP mode
 
 # Server configuration
 PORT = 1000 
+UDP_PORT = 1234  # UDP broadcast port 

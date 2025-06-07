@@ -183,5 +183,4 @@ async def animate(
         remaining_frame_time = FRAME_TIME_MS - calc_time
         
         # Only sleep if we have time remaining
-        if remaining_frame_time > 0:
-            await asyncio.sleep_ms(remaining_frame_time) 
+        await asyncio.sleep_ms(max(10, remaining_frame_time)) 

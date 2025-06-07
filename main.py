@@ -10,11 +10,12 @@ if TYPE_CHECKING:
 
 from pathlib import Path
 from utils import SharedState
-from wifi_client import connect_to_wifi, fetch_animation_data, is_wifi_connected
+from wifi_client import connect_to_wifi, fetch_animation_data, is_wifi_connected, listen_for_udp_state, maintain_connection
 from animations import ANIMATIONS
 from read_sensor import read_sensor, TempratureSettings
 from shape import Shape
 
+USE_SOCKET_SERVER = False  # Set to False to use UDP instead of TCP
 
 def get_shape(file_path: Path) -> tuple[int, int, tuple[tuple[int, ...], ...]]:
     data = json.loads(file_path.read_text())
@@ -97,7 +98,7 @@ async def get_animation_name(state: SharedState):
                 await connect_to_wifi()
         else:
             await state.update('animation', animation_name)
-            await asyncio.sleep(1)
+            await asyncio.sleep(5)
 
 
 def error_animation(shape: Shape) -> None:
@@ -151,7 +152,11 @@ def main():
     state = SharedState(initial_state)
     tasks = []
     tasks.append(run_animations(shape, state))
-    tasks.append(get_animation_name(state))
+    tasks.append(maintain_connection())
+    if USE_SOCKET_SERVER:
+        tasks.append(get_animation_name(state))
+    else:
+        tasks.append(listen_for_udp_state(state))
     tasks.append(read_sensor(state))
     tasks.append(restart_in_30_minutes())
     asyncio.run(asyncio.gather(*tasks))
